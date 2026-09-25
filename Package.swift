@@ -14,13 +14,21 @@ let package = Package(
 
         // Client-side order integrity: client order IDs, idempotency,
         // dedup, and the order state machine.
-        .library(name: "OrderKit", targets: ["OrderKit"])
+        .library(name: "OrderKit", targets: ["OrderKit"]),
+        
+        // Fake event source (snapshot/delta/drop/duplicate/reorder).
+        // Separate product so it never ships inside the app target —
+        // only Tests and the demo app import it.
+        .library(name: "MarketDataKitMocks", targets: ["MarketDataKitMocks"])
     ],
     targets: [
         .target(name: "MarketDataKit"),
         .testTarget(name: "MarketDataKitTests", dependencies: ["MarketDataKit"]),
 
         .target(name: "OrderKit"),
-        .testTarget(name: "OrderKitTests", dependencies: ["OrderKit"])
+        .testTarget(name: "OrderKitTests", dependencies: ["OrderKit"]),
+        
+        .target(name: "MarketDataKitMocks", dependencies: ["MarketDataKit"]),
+        .testTarget(name: "MarketDataKitMocksTests", dependencies: ["MarketDataKitMocks"]),
     ]
 )
