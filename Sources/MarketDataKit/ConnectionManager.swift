@@ -9,17 +9,24 @@
 public actor ConnectionManager {
     private let transport: any MarketDataTransport
     private let backoff: BackoffPolicy
-
+    private let heartbeatTimeout: Duration
+    
     private var attempt = 0
+    private var lastEventAt: ContinuousClock.Instant = .now
     private var runLoopTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
     private var stateContinuation: AsyncStream<ConnectionState>.Continuation?
-
-    public init(transport: some MarketDataTransport, backoff: BackoffPolicy = .default) {
+    
+    /// heartbeatTimeout: if no event (including a server ping/heartbeat
+    /// frame, once the real transport forwards one as a MarketEvent) has
+    /// arrived within this window, the connection is treated as dead
+    /// even though the socket never technically errored or closed.
+    public init(transport: some MarketDataTransport, backoff: BackoffPolicy = .default, heartbeatTimeout: Duration = .seconds(15)) {
         self.transport = transport
         self.backoff = backoff
+        self.heartbeatTimeout = heartbeatTimeout
     }
-
+    
     /// Connection lifecycle, observed independently of the data itself —
     /// lets UI show "reconnecting…" without coupling to price data.
     public func connectionStates() -> AsyncStream<ConnectionState> {
@@ -27,7 +34,7 @@ public actor ConnectionManager {
             self.stateContinuation = continuation
         }
     }
-
+    
     /// Starts the reconnect loop and returns a merged event feed spanning
     /// every connection attempt. Calling this more than once restarts
     /// the loop from a clean attempt counter.
@@ -40,7 +47,7 @@ public actor ConnectionManager {
             }
         }
     }
-
+    
     public func stop() {
         runLoopTask?.cancel()
         watchdogTask?.cancel()
@@ -48,14 +55,17 @@ public actor ConnectionManager {
         watchdogTask = nil
         stateContinuation?.yield(.disconnected)
     }
-
+    
     private func runLoop(into continuation: AsyncStream<MarketEvent>.Continuation) async {
         while !Task.isCancelled {
             stateContinuation?.yield(attempt == 0 ? .connecting : .reconnecting(attempt: attempt))
-
+            lastEventAt = .now
+            startWatchdog()
+            
             var sawAnyEvent = false
             for await event in transport.connect() {
                 if Task.isCancelled { break }
+                lastEventAt = .now
                 if !sawAnyEvent {
                     sawAnyEvent = true
                     attempt = 0
@@ -63,14 +73,34 @@ public actor ConnectionManager {
                 }
                 continuation.yield(event)
             }
-
+            
+            watchdogTask?.cancel()
             if Task.isCancelled { break }
-
+            
             let delay = backoff.delay(forAttempt: attempt)
             attempt += 1
             stateContinuation?.yield(.reconnecting(attempt: attempt))
             try? await Task.sleep(for: delay)
         }
         continuation.finish()
+    }
+    
+    /// Polls elapsed-since-last-event on a short interval. When silence
+    /// exceeds heartbeatTimeout, calls transport.disconnect() to force
+    /// the run loop's `for await` to unblock — without this, a socket
+    /// that goes quiet but never errors would hang the loop forever.
+    private func startWatchdog() {
+        let timeout = heartbeatTimeout
+        watchdogTask = Task { [transport] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                if Task.isCancelled { return }
+                let elapsed = ContinuousClock.now - self.lastEventAt
+                if elapsed > timeout {
+                    await transport.disconnect()
+                    return
+                }
+            }
+        }
     }
 }
