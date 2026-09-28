@@ -40,12 +40,3 @@ public enum ConnectionState: Sendable, Equatable {
     case connected
     case reconnecting(attempt: Int)
 }
-
-/// Public entry point consumers will hold onto. Implementation (actor-backed
-/// store, AsyncStream-driven connection manager, conflation) is TODO.
-public actor MarketDataStore {
-    public init() {}
-
-    // TODO: subscribe(symbols:) -> AsyncStream<InstrumentTick>
-    // TODO: connectionState: AsyncStream<ConnectionState>
-}
