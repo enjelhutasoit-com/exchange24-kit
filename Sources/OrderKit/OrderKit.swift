@@ -80,9 +80,3 @@ public struct Order: Sendable, Equatable {
         self.state = state
     }
 }
-
-/// Placeholder until the next commit replaces it with the real
-/// implementation (gateway, persistence, reconciliation).
-public actor OrderStateMachine {
-    public init() {}
-}
