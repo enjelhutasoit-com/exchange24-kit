@@ -18,46 +18,71 @@ public struct ClientOrderID: Sendable, Hashable {
     }
 }
 
-/// Explicit order lifecycle. `timeoutUnknown` exists specifically for the
-/// "network dropped mid-submit" case from the JD — it is never silently
-/// promoted to success or retried with a new ClientOrderID.
+public enum OrderSide: Sendable, Equatable {
+    case buy
+    case sell
+}
+
+/// Explicit order lifecycle. The states that carry the JD scenario:
+///
+/// - `timeoutUnknown`: the request may or may not have reached the
+///   server. Never treated as success, never as failure, never retried
+///   with a new ClientOrderID.
+/// - `reconciling`: asking the server what actually happened.
+/// - `notPlaced`: the server confirmed it has no record of this ID, so
+///   it is safe to resubmit with the SAME ClientOrderID.
 public enum OrderState: Sendable, Equatable {
     case draft
-    case validating
     case submitting
-    case submitted
     case acknowledged
     case partiallyFilled(filledQuantity: Int)
     case filled
     case rejected(reason: String)
     case timeoutUnknown
     case reconciling
-    case cancelPending
-    case cancelled
+    case notPlaced
+    case cancelPending(filledQuantity: Int)
+    case cancelled(filledQuantity: Int)
+    
+    /// No further transitions expected from the server for this order.
+    public var isTerminal: Bool {
+        switch self {
+        case .filled, .rejected, .cancelled:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 public struct Order: Sendable, Equatable {
     public let id: ClientOrderID
     public let symbol: String
+    public let side: OrderSide
     public let quantity: Int
     public let price: Decimal
-    public private(set) var state: OrderState
+    /// Only the state machine changes this, through OrderReducer.
+    public internal(set) var state: OrderState
 
-    public init(id: ClientOrderID, symbol: String, quantity: Int, price: Decimal, state: OrderState = .draft) {
+    public init(
+        id: ClientOrderID,
+        symbol: String,
+        side: OrderSide = .buy,
+        quantity: Int,
+        price: Decimal,
+        state: OrderState = .draft
+    ) {
         self.id = id
         self.symbol = symbol
+        self.side = side
         self.quantity = quantity
         self.price = price
         self.state = state
     }
 }
 
-/// Public entry point consumers will hold onto. Implementation (reducer,
-/// persistence, reconciliation-on-reconnect) is TODO.
+/// Placeholder until the next commit replaces it with the real
+/// implementation (gateway, persistence, reconciliation).
 public actor OrderStateMachine {
     public init() {}
-
-    // TODO: submit(_ order: Order) async throws
-    // TODO: apply(_ event: OrderEvent, to id: ClientOrderID) async
-    // TODO: reconcile(pending: [ClientOrderID]) async
 }
