@@ -19,16 +19,23 @@ let package = Package(
         // Fake event source (snapshot/delta/drop/duplicate/reorder).
         // Separate product so it never ships inside the app target —
         // only Tests and the demo app import it.
-        .library(name: "MarketDataKitMocks", targets: ["MarketDataKitMocks"])
+        .library(name: "MarketDataKitMocks", targets: ["MarketDataKitMocks"]),
+        
+        // Simulated exchange (idempotent submit, latency, scripted network
+        // failures, automatic fills). Same rule: tests and demo app only.
+        .library(name: "OrderKitMocks", targets: ["OrderKitMocks"]),
     ],
     targets: [
         .target(name: "MarketDataKit"),
         .testTarget(name: "MarketDataKitTests", dependencies: ["MarketDataKit"]),
+        
+        .target(name: "MarketDataKitMocks", dependencies: ["MarketDataKit"]),
+        .testTarget(name: "MarketDataKitMocksTests", dependencies: ["MarketDataKitMocks"]),
 
         .target(name: "OrderKit"),
         .testTarget(name: "OrderKitTests", dependencies: ["OrderKit"]),
         
-        .target(name: "MarketDataKitMocks", dependencies: ["MarketDataKit"]),
-        .testTarget(name: "MarketDataKitMocksTests", dependencies: ["MarketDataKitMocks"]),
+        .target(name: "OrderKitMocks", dependencies: ["OrderKit"]),
+        .testTarget(name: "OrderKitMocksTests", dependencies: ["OrderKitMocks", "OrderKit"])
     ]
 )
