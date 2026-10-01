@@ -107,13 +107,13 @@ directly.
 
 - [x] SPM skeleton (this commit)
 - [x] CI stub (build + test on push/PR)
-- [ ] Fake event generator (snapshot/delta/drop/duplicate/reorder)
-- [ ] Connection manager (`AsyncStream`, exponential backoff + jitter)
-- [ ] Snapshot+delta merge engine + tests
-- [ ] Conflation/throttle layer
-- [ ] Order state machine + idempotency + persistence
-- [ ] Reconciliation logic + failure-scenario tests
-- [ ] Demo SwiftUI app wiring both modules
+- [x] Fake event generator (snapshot/delta/drop/duplicate/reorder)
+- [x] Connection manager (`AsyncStream`, exponential backoff + jitter)
+- [x] Snapshot+delta merge engine + tests
+- [x] Conflation/throttle layer
+- [x] Order state machine + idempotency + persistence
+- [x] Reconciliation logic + failure-scenario tests
+- [x] Demo SwiftUI app wiring both modules github.com/enjelhutasoit-com/exchange24-ios
 
 ## Running tests
 
